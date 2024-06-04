@@ -35,27 +35,33 @@ function formatBinary() {
   }
   // nach jeder 8. Stelle ein Leerzeichen einfügen
   state.binary = state.binary.replace(/\s/g, '').match(/.{1,8}/g).join(' ')
+}
 
+
+const binaryToHexAndText = () => {
+  if (state.binary.replace(/\s/g, '').length === 0) {
+    state.hex = '';
+    state.text = '';
+    return;
+  }
+
+  //prüfe auf illegale binäre Zeichen
   if (state.binary.replace(/[01\s]/g, '').length > 0) {
     state.binaryInvalid = true;
     return;
   }
   state.binaryInvalid = false;
-}
 
+  let cleanBinary = state.binary.replace(/\s/g, '')
 
-const binaryToHexAndText = () => {
+  // nur formatieren, wenn ich nicht gerade bearbeite (= wenn Länge Vielfaches von 8)
+  if (cleanBinary.length % 8 !== 0) {
+    return
+  }
   formatBinary();
 
   let hexResult = '';
   let textResult = '';
-
-  let cleanBinary = state.binary.replace(/\s/g, '')
-
-  // wenn länge exklusive leerzeichen nicht vielfaches von 8, dann abbrechen
-  if (cleanBinary.length % 8 !== 0) {
-    return;
-  }
 
   const binaryValues = cleanBinary.match(/.{1,8}/g) || [];
 
@@ -67,6 +73,9 @@ const binaryToHexAndText = () => {
 
   state.hex = hexResult.trim();
   state.text = textResult;
+
+  state.binaryInvalid = false;
+  state.hexInvalid = false;
 };
 
 function formatHex() {
@@ -75,6 +84,14 @@ function formatHex() {
   }
   // nach jeder 2. Stelle ein Leerzeichen einfügen
   state.hex = state.hex.replace(/\s/g, '').match(/.{1,2}/g).join(' ')
+}
+
+const hexToBinaryAndText = () => {
+  if (state.hex.replace(/\s/g, '').length === 0) {
+    state.binary = '';
+    state.text = '';
+    return;
+  }
 
   //prüfe auf illegale hex zeichen
   if (state.hex.replace(/[0-9a-fA-F\s]/g, '').length > 0) {
@@ -82,9 +99,10 @@ function formatHex() {
     return;
   }
   state.hexInvalid = false;
-}
 
-const hexToBinaryAndText = () => {
+  if (state.hex.replace(/\s/g, '').length % 2 !== 0) {
+    return
+  }
   formatHex();
 
   let binaryResult = '';
@@ -100,19 +118,31 @@ const hexToBinaryAndText = () => {
 
   state.binary = binaryResult.trim();
   state.text = textResult;
+
+  state.binaryInvalid = false;
+  state.hexInvalid = false;
 };
 
 const textToBinaryAndHex = () => {
+  if (state.text.length === 0) {
+    state.binary = '';
+    state.hex = '';
+    return;
+  }
+
   let binaryResult = '';
   let hexResult = '';
 
   for (let i = 0; i < state.text.length; i++) {
-    binaryResult += state.text.charCodeAt(i).toString(2).padStart(8, '0') + ' ';
-    hexResult += state.text.charCodeAt(i).toString(16).padStart(2, '0') + ' ';
+    binaryResult += state.text.charCodeAt(i).toString(2).padStart(8, '0');
+    hexResult += state.text.charCodeAt(i).toString(16).padStart(2, '0');
   }
 
-  state.binary = binaryResult.trim();
-  state.hex = hexResult.trim();
+  state.binary = binaryResult.trim().match(/.{1,8}/g).join(' ');
+  state.hex = hexResult.trim().match(/.{1,2}/g).join(' ');
+
+  state.binaryInvalid = false;
+  state.hexInvalid = false;
 };
 
 
@@ -164,12 +194,12 @@ const textToBinaryAndHex = () => {
 
 @media screen and (min-width: 768px) {
   .tableLayout {
-    height: 80vh;
+    height: 60vh;
   }
 }
 
 .tableLayout {
-  border: 1px solid rgb(197, 197, 197);
+  /* border: 1px solid rgb(197, 197, 197); */
   padding: 10px;
   text-align: center;
 }
