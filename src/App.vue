@@ -91,6 +91,7 @@ const binaryToHexAndText = () => {
   if (state.binary.replace(/\s/g, '').length === 0) {
     state.hex = '';
     state.text = '';
+    state.binaryInvalid = false;
     return;
   }
 
@@ -139,6 +140,7 @@ const hexToBinaryAndText = () => {
   if (state.hex.replace(/\s/g, '').length === 0) {
     state.binary = '';
     state.text = '';
+    state.hexInvalid = false;
     return;
   }
 
