@@ -11,12 +11,61 @@ const state = reactive({
   binary: '',
   binaryInvalid: false,
   hexInvalid: false,
+  asciiTable: generateAsciiTable(),
+  showASCII: false,
 })
 
 
 onBeforeMount(() => {
-  //
+  //generateAsciiTable()
 });
+
+const asciiTableParts = computed(() => {
+  let parts = [];
+  let partSize = Math.ceil(state.asciiTable.length / 3);
+  for (let i = 0; i < 3; i++) {
+    parts.push(state.asciiTable.slice(i * partSize, (i + 1) * partSize));
+  }
+
+  //print length of each part
+  console.log(parts.map(part => part.length));
+    
+  return parts;
+})
+
+function generateAsciiTable() {
+      let table = [];
+      
+      // Steuerzeichen 0 bis 31
+      let controlChars = [
+        'NUL', 'SOH', 'STX', 'ETX', 'EOT', 'ENQ', 'ACK', 'BEL',
+        'BS', 'HT', 'LF', 'VT', 'FF', 'CR', 'SO', 'SI',
+        'DLE', 'DC1', 'DC2', 'DC3', 'DC4', 'NAK', 'SYN', 'ETB',
+        'CAN', 'EM', 'SUB', 'ESC', 'FS', 'GS', 'RS', 'US'
+      ];
+      for (let i = 0; i < controlChars.length; i++) {
+        let character = controlChars[i];
+        let binary = i.toString(2).padStart(8, '0');
+        let hex = i.toString(16).toUpperCase();
+        table.push({ character, binary, hex });
+      }
+
+      // Zeichen 32 bis 126 (lesbare Zeichen)
+      for (let i = 32; i <= 126; i++) {
+        let character = String.fromCharCode(i);
+        let binary = i.toString(2).padStart(8, '0');
+        let hex = i.toString(16).toUpperCase();
+        table.push({ character, binary, hex });
+      }
+
+      // letztes Steuerzeichen
+      table.push({ character: 'DEL', binary: '11111111', hex: '7F' })
+
+      // leeres Feld, damit Tabelleninhalt durch 3 teilbar ist
+      table.push({ character: '\u00A0', binary: ' ', hex: ' ' });
+
+      return table;
+}
 
 onMounted(() => {
   const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]')
@@ -155,14 +204,11 @@ const textToBinaryAndHex = () => {
     data-bs-content='Quellcode auf <a href="https://github.com/tools-info-bw-de/hexeditor" target="_blank">github</a>!<br>§ MIT - Marco Kümmel'>info</button>
 
   <h1 class="mb-4">Hex-Editor</h1>
-  <div class="row">
-    Dropdown Ascii/Ansi
-  </div>
   <div class="container-xxl">
     <div class="row mt-3">
       <div class="col-md-8 col-sm-12 tableLayout">
         <h3>Binär</h3>
-        <textarea class="form-control" v-model="state.binary" @input="binaryToHexAndText"></textarea>
+        <textarea id="binaryTextarea" class="form-control" v-model="state.binary" @input="binaryToHexAndText"></textarea>
 
         <div v-if="state.binaryInvalid" class="alert alert-danger mt-2" role="alert">
           Binäreingabe ungültig. Nur 0 und 1 erlaubt!
@@ -170,7 +216,7 @@ const textToBinaryAndHex = () => {
       </div>
       <div class="col-md-2 col-sm-12 tableLayout">
         <h3>Hexadezimal</h3>
-        <textarea class="form-control" v-model="state.hex" @input="hexToBinaryAndText"></textarea>
+        <textarea id="hexTextarea" class="form-control" v-model="state.hex" @input="hexToBinaryAndText"></textarea>
 
         <div v-if="state.hexInvalid" class="alert alert-danger mt-2" role="alert">
           Hexadezimaleingabe ungültig. Nur 0-9 und a-f erlaubt!
@@ -178,17 +224,83 @@ const textToBinaryAndHex = () => {
       </div>
       <div class="col-md-2 col-sm-12 tableLayout">
         <h3>Text</h3>
-        <textarea class="form-control" v-model="state.text" @input="textToBinaryAndHex"></textarea>
+        <textarea id="textTextarea" class="form-control" v-model="state.text" @input="textToBinaryAndHex"></textarea>
+      </div>
+    </div>
+
+
+    <div class="form-check form-switch mt-3" id="showASCIISwitch">
+      <input v-model="state.showASCII" class="form-check-input" type="checkbox" role="switch" id="showASCII">
+      <label class="form-check-label user-select-none" for="showASCII">Zeige ASCII-Tabelle</label>
+    </div>
+
+
+    <div class="row" v-if="state.showASCII">
+      <div class="table-container">
+        <table class="table table-striped" v-for="(tablePart, index) in asciiTableParts" :key="index">
+          <thead>
+            <tr>
+              <th>Binär</th>
+              <th>Hex</th>
+              <th>Zeichen</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="char in tablePart" :key="char.character">
+              <td class="binaryTable">{{ char.binary }}</td>
+              <td class="hexTable">{{ char.hex }}</td>
+              <td class="characterTable">{{ char.character }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.table tr {
+  line-height: 1;
+}
+
+#showASCIISwitch {
+  text-align: left;
+}
+
+.table-container > table:not(:last-child) {
+  border-right: 2px solid #000; 
+}
+
+.table-container > table {
+  flex: 1 0 300px;
+}
+
+.table-container {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+#binaryTextarea, .binaryTable {
+  background-color: #d1fad1;
+}
+
+#hexTextarea, .hexTable {
+  background-color: #ffcece;
+}
+
+#textTextarea, .characterTable {
+  background-color: #cff5ff;
+}
+
 @media screen and (max-width: 768px) {
   .tableLayout {
     height: inherit;
     margin-top: 10px;
+  }
+
+  .table-container > table {
+    flex: 1 0 100%;
   }
 }
 
@@ -199,7 +311,6 @@ const textToBinaryAndHex = () => {
 }
 
 .tableLayout {
-  /* border: 1px solid rgb(197, 197, 197); */
   padding: 10px;
   text-align: center;
 }
