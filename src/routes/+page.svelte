@@ -8,6 +8,11 @@
 	let hoveredByteRange = $state(null);
 	let fileInput = $state();
 	let fileName = $state('hexeditor.txt');
+	let splitContainer = $state();
+	let firstSplit = $state(0.6);
+	let secondSplit = $state(0.8);
+	let activeHandle = $state(null);
+	const minPaneRatio = 0.12;
 
 	function setHover(start, length) {
 		hoveredByteRange = start !== null ? { start, length } : null;
@@ -82,7 +87,42 @@
 		anchor.click();
 		URL.revokeObjectURL(url);
 	}
+
+	function startResize(handle, event) {
+		if (window.matchMedia('(max-width: 980px)').matches) return;
+		activeHandle = handle;
+		event.currentTarget.setPointerCapture(event.pointerId);
+	}
+
+	function stopResize() {
+		activeHandle = null;
+	}
+
+	function handlePointerMove(event) {
+		if (!activeHandle || !splitContainer) return;
+
+		const rect = splitContainer.getBoundingClientRect();
+		if (rect.width <= 0) return;
+
+		const x = event.clientX - rect.left;
+		const ratio = Math.max(0, Math.min(1, x / rect.width));
+
+		if (activeHandle === 'first') {
+			firstSplit = Math.max(minPaneRatio, Math.min(secondSplit - minPaneRatio, ratio));
+			return;
+		}
+
+		if (activeHandle === 'second') {
+			secondSplit = Math.max(firstSplit + minPaneRatio, Math.min(1 - minPaneRatio, ratio));
+		}
+	}
 </script>
+
+<svelte:window
+	onpointermove={handlePointerMove}
+	onpointerup={stopResize}
+	onpointercancel={stopResize}
+/>
 
 <main class="app">
 	<h1>Hex-Editor</h1>
@@ -125,10 +165,40 @@
 			</select>
 		</label>
 	</div>
-	<section class="grid">
-		<BinaryView {bytes} {hoveredByteRange} {setHover} {updateBytes} />
-		<HexView {bytes} {hoveredByteRange} {setHover} {updateBytes} />
-		<TextView {bytes} {hoveredByteRange} {setHover} {updateBytes} {encoding} {setEncoding} />
+	<section
+		class="grid"
+		bind:this={splitContainer}
+		style={`--w1:${firstSplit * 100}%; --w2:${(secondSplit - firstSplit) * 100}%; --w3:${(1 - secondSplit) * 100}%;`}
+	>
+		<div class="pane pane-binary">
+			<BinaryView {bytes} {hoveredByteRange} {setHover} {updateBytes} />
+		</div>
+
+		<button
+			class="gutter"
+			type="button"
+			role="separator"
+			aria-orientation="vertical"
+			aria-label="Breite zwischen Binaer und Hex anpassen"
+			onpointerdown={(event) => startResize('first', event)}
+		></button>
+
+		<div class="pane pane-hex">
+			<HexView {bytes} {hoveredByteRange} {setHover} {updateBytes} />
+		</div>
+
+		<button
+			class="gutter"
+			type="button"
+			role="separator"
+			aria-orientation="vertical"
+			aria-label="Breite zwischen Hex und Text anpassen"
+			onpointerdown={(event) => startResize('second', event)}
+		></button>
+
+		<div class="pane pane-text">
+			<TextView {bytes} {hoveredByteRange} {setHover} {updateBytes} {encoding} {setEncoding} />
+		</div>
 	</section>
 </main>
 
@@ -153,14 +223,52 @@
 	}
 
 	.grid {
-		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
+		display: flex;
+		align-items: stretch;
 		gap: 1rem;
+		--w1: 60%;
+		--w2: 20%;
+		--w3: 20%;
+	}
+
+	.pane {
+		min-width: 0;
+	}
+
+	.pane-binary {
+		flex: 0 1 var(--w1);
+	}
+
+	.pane-hex {
+		flex: 0 1 var(--w2);
+	}
+
+	.pane-text {
+		flex: 0 1 var(--w3);
+	}
+
+	.gutter {
+		flex: 0 0 10px;
+		cursor: col-resize;
+		border-radius: 999px;
+		background: linear-gradient(180deg, #d9e2ee 0%, #c4d1e3 100%);
+		user-select: none;
+		touch-action: none;
+	}
+
+	.gutter:hover,
+	.gutter:focus {
+		outline: none;
+		background: linear-gradient(180deg, #b5c7de 0%, #91add0 100%);
 	}
 
 	@media (max-width: 980px) {
 		.grid {
-			grid-template-columns: 1fr;
+			flex-direction: column;
+		}
+
+		.gutter {
+			display: none;
 		}
 	}
 </style>

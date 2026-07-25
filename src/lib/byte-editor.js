@@ -394,25 +394,65 @@ function getTypographyMetrics(element) {
 	};
 }
 
-function getVisualPositionFromIndex(text, charIndex, charsPerRow) {
-	const lines = text.split('\n');
+function buildVisualRows(text, charsPerRow, wrapMode = 'char') {
+	const visualRows = [];
 	let absoluteStart = 0;
-	let row = 0;
+	const lines = text.split('\n');
 
 	for (let i = 0; i < lines.length; i += 1) {
 		const line = lines[i];
-		const lineLength = line.length;
 
-		if (charIndex <= absoluteStart + lineLength) {
-			const local = Math.max(0, charIndex - absoluteStart);
-			row += Math.floor(local / charsPerRow);
-			const col = local % charsPerRow;
-			return { row, col };
+		if (line.length === 0) {
+			visualRows.push({ start: absoluteStart, length: 0 });
+		} else if (wrapMode === 'word') {
+			let localStart = 0;
+			while (localStart < line.length) {
+				const remaining = line.length - localStart;
+				if (remaining <= charsPerRow) {
+					visualRows.push({ start: absoluteStart + localStart, length: remaining });
+					break;
+				}
+
+				let localEnd = line.lastIndexOf(' ', localStart + charsPerRow - 1);
+				if (localEnd < localStart) {
+					localEnd = localStart + charsPerRow;
+				} else {
+					// Include the whitespace where the break happened.
+					localEnd += 1;
+				}
+
+				visualRows.push({ start: absoluteStart + localStart, length: localEnd - localStart });
+				localStart = localEnd;
+			}
+		} else {
+			for (let offset = 0; offset < line.length; offset += charsPerRow) {
+				const length = Math.min(charsPerRow, line.length - offset);
+				visualRows.push({ start: absoluteStart + offset, length });
+			}
 		}
 
-		const visualRowsForLine = Math.max(1, Math.ceil(lineLength / charsPerRow));
-		row += visualRowsForLine;
-		absoluteStart += lineLength + 1;
+		absoluteStart += line.length;
+		if (i < lines.length - 1) absoluteStart += 1;
+	}
+
+	return visualRows;
+}
+
+function getVisualPositionFromIndex(text, charIndex, charsPerRow, wrapMode = 'char') {
+	const visualRows = buildVisualRows(text, charsPerRow, wrapMode);
+
+	for (let row = 0; row < visualRows.length; row += 1) {
+		const current = visualRows[row];
+		const rowEnd = current.start + current.length;
+		if (charIndex >= current.start && charIndex < rowEnd) {
+			return { row, col: charIndex - current.start };
+		}
+	}
+
+	// Cursor exactly at end of text belongs to last row.
+	if (visualRows.length > 0 && charIndex === text.length) {
+		const last = visualRows[visualRows.length - 1];
+		return { row: visualRows.length - 1, col: last.length };
 	}
 
 	return null;
@@ -422,14 +462,14 @@ export function ensureCharVisible(
 	element,
 	text,
 	charIndex,
-	{ behavior = 'smooth', marginRows = 1, marginCols = 2 } = {}
+	{ behavior = 'smooth', marginRows = 1, marginCols = 2, wrapMode = 'char' } = {}
 ) {
 	if (!element || !text || charIndex === null || charIndex < 0 || charIndex >= text.length) return;
 
 	const metrics = getTypographyMetrics(element);
 	if (!metrics) return;
 
-	const pos = getVisualPositionFromIndex(text, charIndex, metrics.charsPerRow);
+	const pos = getVisualPositionFromIndex(text, charIndex, metrics.charsPerRow, wrapMode);
 	if (!pos) return;
 
 	const x = metrics.paddingLeft + pos.col * metrics.charWidth;
@@ -477,7 +517,7 @@ export function ensureCharVisible(
 	}
 }
 
-export function getCharIndexFromMouse(event, element, text) {
+export function getCharIndexFromMouse(event, element, text, { wrapMode = 'char' } = {}) {
 	if (!text.length) return null;
 
 	const rect = element.getBoundingClientRect();
@@ -491,26 +531,7 @@ export function getCharIndexFromMouse(event, element, text) {
 
 	const row = Math.floor(y / metrics.lineHeight);
 	const col = Math.floor(x / metrics.charWidth);
-
-	const visualRows = [];
-	let absoluteStart = 0;
-	const lines = text.split('\n');
-
-	for (let i = 0; i < lines.length; i += 1) {
-		const line = lines[i];
-
-		if (line.length === 0) {
-			visualRows.push({ start: absoluteStart, length: 0 });
-		} else {
-			for (let offset = 0; offset < line.length; offset += metrics.charsPerRow) {
-				const length = Math.min(metrics.charsPerRow, line.length - offset);
-				visualRows.push({ start: absoluteStart + offset, length });
-			}
-		}
-
-		absoluteStart += line.length;
-		if (i < lines.length - 1) absoluteStart += 1;
-	}
+	const visualRows = buildVisualRows(text, metrics.charsPerRow, wrapMode);
 
 	if (row < 0 || row >= visualRows.length) return null;
 	const visualRow = visualRows[row];

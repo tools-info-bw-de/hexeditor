@@ -37,7 +37,7 @@
 	$effect(() => {
 		if (!highlightRange || !editorEl) return;
 
-		ensureCharVisible(editorEl, text, highlightRange.start);
+		ensureCharVisible(editorEl, text, highlightRange.start, { wrapMode: 'word' });
 		syncScroll();
 	});
 
@@ -54,7 +54,7 @@
 	}
 
 	function handleMouseMove(event) {
-		const charIndex = getCharIndexFromMouse(event, editorEl, text);
+		const charIndex = getCharIndexFromMouse(event, editorEl, text, { wrapMode: 'word' });
 		if (charIndex === null) {
 			setHover(null, 0);
 			return;
@@ -160,8 +160,8 @@
 		border: 1px solid #c6d0dd;
 		border-radius: 0.65rem;
 		white-space: pre-wrap;
-		word-break: break-all;
-		overflow-wrap: anywhere;
+		word-break: normal;
+		overflow-wrap: normal;
 		overflow-x: hidden;
 		overflow-y: auto;
 		scrollbar-gutter: stable both-edges;
