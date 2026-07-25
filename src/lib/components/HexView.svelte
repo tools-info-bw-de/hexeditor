@@ -1,14 +1,12 @@
 <script>
 	import {
-		buildHighlightSetFromByteRange,
+		buildRangeSegments,
 		bytesToHexText,
 		ensureCharVisible,
 		formatHexInput,
-		getFirstHighlightedIndex,
 		getCharIndexFromMouse,
 		hexCharIndexToByteIndex,
-		parseHexText,
-		textToSegments
+		parseHexText
 	} from '$lib/byte-editor';
 
 	let { bytes, hoveredByteRange, setHover, updateBytes } = $props();
@@ -24,16 +22,22 @@
 		}
 	});
 
-	let highlightedIndices = $derived(
-		buildHighlightSetFromByteRange(text, hexCharIndexToByteIndex, hoveredByteRange)
+	let highlightRange = $derived(
+		hoveredByteRange && hoveredByteRange.length > 0
+			? {
+					start: hoveredByteRange.start * 3,
+					endExclusive: (hoveredByteRange.start + hoveredByteRange.length - 1) * 3 + 2
+				}
+			: null
 	);
-	let segments = $derived(textToSegments(text, highlightedIndices));
+	let segments = $derived(
+		buildRangeSegments(text, highlightRange?.start ?? null, highlightRange?.endExclusive ?? null)
+	);
 
 	$effect(() => {
-		const firstHighlightedIndex = getFirstHighlightedIndex(highlightedIndices);
-		if (firstHighlightedIndex === null || !editorEl) return;
+		if (!highlightRange || !editorEl) return;
 
-		ensureCharVisible(editorEl, text, firstHighlightedIndex);
+		ensureCharVisible(editorEl, text, highlightRange.start);
 		syncScroll();
 	});
 
@@ -62,10 +66,13 @@
 			return;
 		}
 
+		if (hoveredByteRange?.start === byteIndex && hoveredByteRange?.length === 1) return;
+
 		setHover(byteIndex, 1);
 	}
 
 	function clearHover() {
+		if (!hoveredByteRange) return;
 		setHover(null, 0);
 	}
 
@@ -95,6 +102,7 @@
 					class:highlighted={segment.highlighted}>{segment.text}</span
 				>{/each}</pre>
 		<textarea
+			class="form-control"
 			bind:this={editorEl}
 			bind:value={text}
 			oninput={handleInput}
@@ -110,6 +118,14 @@
 </section>
 
 <style>
+	.overlay {
+		background: #ffcece !important;
+	}
+
+	textarea:focus {
+		background: transparent;
+	}
+
 	.panel {
 		display: flex;
 		flex-direction: column;
@@ -124,13 +140,20 @@
 
 	.editor-wrap {
 		position: relative;
-		min-height: 16rem;
+		min-height: 400px;
 	}
 
 	.overlay,
 	textarea {
 		box-sizing: border-box;
 		font-family: 'Fira Code', 'JetBrains Mono', monospace;
+		font-variant-ligatures: none;
+		font-feature-settings:
+			'liga' 0,
+			'calt' 0;
+		letter-spacing: 0;
+		tab-size: 1;
+		text-rendering: geometricPrecision;
 		font-size: 0.95rem;
 		line-height: 1.5;
 		padding: 0.75rem;
@@ -141,6 +164,7 @@
 		overflow-wrap: anywhere;
 		overflow-x: hidden;
 		overflow-y: auto;
+		scrollbar-gutter: stable both-edges;
 	}
 
 	.overlay {
@@ -157,6 +181,7 @@
 		z-index: 1;
 		width: 100%;
 		height: 18rem;
+		min-height: 400px;
 		background: transparent;
 		color: #1d2a3a;
 		caret-color: #1d2a3a;

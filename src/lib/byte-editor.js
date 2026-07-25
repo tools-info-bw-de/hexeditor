@@ -101,6 +101,18 @@ export function hexCharIndexToByteIndex(text, charIndex) {
 }
 
 export function bytesToTextAndMap(bytes, encoding = 'utf-8') {
+	const toDisplayChar = (char) => {
+		if (char === '\n') return '\n';
+		if (char === '\t') return '⇥';
+
+		const code = char.codePointAt(0);
+		if (code === undefined) return '\uFFFD';
+
+		// Normalize control chars to visible fixed-width glyphs.
+		if ((code >= 0x00 && code <= 0x1f) || code === 0x7f) return '·';
+		return char;
+	};
+
 	const normalizedEncoding = encoding.toLowerCase();
 
 	if (normalizedEncoding === 'ascii' || normalizedEncoding === 'iso-8859-1') {
@@ -109,12 +121,13 @@ export function bytesToTextAndMap(bytes, encoding = 'utf-8') {
 
 		for (let i = 0; i < bytes.length; i += 1) {
 			const byte = bytes[i];
-			const char =
+			const rawChar =
 				normalizedEncoding === 'ascii'
 					? byte <= 0x7f
 						? String.fromCharCode(byte)
 						: '\uFFFD'
 					: String.fromCharCode(byte);
+			const char = toDisplayChar(rawChar);
 
 			const charStart = text.length;
 			text += char;
@@ -148,7 +161,7 @@ export function bytesToTextAndMap(bytes, encoding = 'utf-8') {
 		const actualLength = Math.min(length, bytes.length - i);
 		const slice = bytes.subarray(i, i + actualLength);
 		const decoded = decoder.decode(slice);
-		const char = decoded || '\uFFFD';
+		const char = toDisplayChar(decoded || '\uFFFD');
 		const charStart = text.length;
 		text += char;
 		const charEnd = text.length;
@@ -271,6 +284,76 @@ export function textToSegments(text, highlightedIndices) {
 	return segments;
 }
 
+export function buildRangeSegments(text, start, endExclusive) {
+	if (!text) return [];
+	if (start === null || endExclusive === null) {
+		return [{ text, highlighted: false }];
+	}
+
+	const safeStart = Math.max(0, Math.min(start, text.length));
+	const safeEnd = Math.max(safeStart, Math.min(endExclusive, text.length));
+
+	const segments = [];
+	if (safeStart > 0) {
+		segments.push({ text: text.slice(0, safeStart), highlighted: false });
+	}
+
+	if (safeEnd > safeStart) {
+		segments.push({ text: text.slice(safeStart, safeEnd), highlighted: true });
+	}
+
+	if (safeEnd < text.length) {
+		segments.push({ text: text.slice(safeEnd), highlighted: false });
+	}
+
+	return segments;
+}
+
+export function findCharRangeForByteRange(map, byteRange) {
+	if (!byteRange || !Array.isArray(map) || map.length === 0) return null;
+
+	const rangeStart = byteRange.start;
+	const rangeEnd = byteRange.start + byteRange.length;
+	if (rangeStart < 0 || rangeEnd <= rangeStart) return null;
+
+	let low = 0;
+	let high = map.length - 1;
+	let first = -1;
+
+	while (low <= high) {
+		const mid = (low + high) >> 1;
+		const token = map[mid];
+		const tokenEnd = token.byteStart + token.byteLength;
+
+		if (tokenEnd > rangeStart) {
+			first = mid;
+			high = mid - 1;
+		} else {
+			low = mid + 1;
+		}
+	}
+
+	if (first === -1) return null;
+
+	let charStart = null;
+	let charEnd = null;
+
+	for (let i = first; i < map.length; i += 1) {
+		const token = map[i];
+		const tokenStart = token.byteStart;
+		const tokenEnd = token.byteStart + token.byteLength;
+
+		if (tokenStart >= rangeEnd) break;
+		if (tokenEnd <= rangeStart) continue;
+
+		if (charStart === null) charStart = token.charStart;
+		charEnd = token.charEnd;
+	}
+
+	if (charStart === null || charEnd === null) return null;
+	return { start: charStart, endExclusive: charEnd };
+}
+
 export function getFirstHighlightedIndex(highlightedIndices) {
 	if (!highlightedIndices || highlightedIndices.size === 0) return null;
 
@@ -335,7 +418,12 @@ function getVisualPositionFromIndex(text, charIndex, charsPerRow) {
 	return null;
 }
 
-export function ensureCharVisible(element, text, charIndex) {
+export function ensureCharVisible(
+	element,
+	text,
+	charIndex,
+	{ behavior = 'smooth', marginRows = 1, marginCols = 2 } = {}
+) {
 	if (!element || !text || charIndex === null || charIndex < 0 || charIndex >= text.length) return;
 
 	const metrics = getTypographyMetrics(element);
@@ -346,28 +434,46 @@ export function ensureCharVisible(element, text, charIndex) {
 
 	const x = metrics.paddingLeft + pos.col * metrics.charWidth;
 	const y = metrics.paddingTop + pos.row * metrics.lineHeight;
+	const xMargin = marginCols * metrics.charWidth;
+	const yMargin = marginRows * metrics.lineHeight;
 
 	const viewLeft = element.scrollLeft + metrics.paddingLeft;
 	const viewRight = element.scrollLeft + element.clientWidth - metrics.paddingRight;
 	const viewTop = element.scrollTop + metrics.paddingTop;
 	const viewBottom = element.scrollTop + element.clientHeight - metrics.paddingBottom;
 
-	if (x < viewLeft) {
-		element.scrollLeft = Math.max(0, x - metrics.paddingLeft);
-	} else if (x + metrics.charWidth > viewRight) {
-		element.scrollLeft = Math.max(
+	let nextScrollLeft = element.scrollLeft;
+	let nextScrollTop = element.scrollTop;
+	let didChange = false;
+
+	if (x - xMargin < viewLeft) {
+		nextScrollLeft = Math.max(0, x - xMargin - metrics.paddingLeft);
+		didChange = true;
+	} else if (x + metrics.charWidth + xMargin > viewRight) {
+		nextScrollLeft = Math.max(
 			0,
-			x + metrics.charWidth - (element.clientWidth - metrics.paddingRight)
+			x + metrics.charWidth + xMargin - (element.clientWidth - metrics.paddingRight)
 		);
+		didChange = true;
 	}
 
-	if (y < viewTop) {
-		element.scrollTop = Math.max(0, y - metrics.paddingTop);
-	} else if (y + metrics.lineHeight > viewBottom) {
-		element.scrollTop = Math.max(
+	if (y - yMargin < viewTop) {
+		nextScrollTop = Math.max(0, y - yMargin - metrics.paddingTop);
+		didChange = true;
+	} else if (y + metrics.lineHeight + yMargin > viewBottom) {
+		nextScrollTop = Math.max(
 			0,
-			y + metrics.lineHeight - (element.clientHeight - metrics.paddingBottom)
+			y + metrics.lineHeight + yMargin - (element.clientHeight - metrics.paddingBottom)
 		);
+		didChange = true;
+	}
+
+	if (didChange) {
+		element.scrollTo({
+			left: nextScrollLeft,
+			top: nextScrollTop,
+			behavior
+		});
 	}
 }
 

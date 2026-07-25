@@ -1,16 +1,15 @@
 <script>
 	import {
-		buildTextHighlightSetFromByteRange,
+		buildRangeSegments,
 		bytesToTextAndMap,
 		ensureCharVisible,
-		getFirstHighlightedIndex,
+		findCharRangeForByteRange,
 		getCharIndexFromMouse,
 		parseText,
-		textCharIndexToByteRange,
-		textToSegments
+		textCharIndexToByteRange
 	} from '$lib/byte-editor';
 
-	let { bytes, hoveredByteRange, setHover, updateBytes, encoding, setEncoding } = $props();
+	let { bytes, hoveredByteRange, setHover, updateBytes, encoding } = $props();
 
 	let mapped = $derived(bytesToTextAndMap(bytes, encoding));
 	let text = $state('');
@@ -25,26 +24,21 @@
 		}
 	});
 
-	let highlightedIndices = $derived(
-		buildTextHighlightSetFromByteRange(text, map, hoveredByteRange)
+	let highlightRange = $derived(findCharRangeForByteRange(map, hoveredByteRange));
+	let segments = $derived(
+		buildRangeSegments(text, highlightRange?.start ?? null, highlightRange?.endExclusive ?? null)
 	);
-	let segments = $derived(textToSegments(text, highlightedIndices));
 
 	$effect(() => {
-		const firstHighlightedIndex = getFirstHighlightedIndex(highlightedIndices);
-		if (firstHighlightedIndex === null || !editorEl) return;
+		if (!highlightRange || !editorEl) return;
 
-		ensureCharVisible(editorEl, text, firstHighlightedIndex);
+		ensureCharVisible(editorEl, text, highlightRange.start);
 		syncScroll();
 	});
 
 	function handleInput(event) {
 		text = event.currentTarget.value;
 		updateBytes(parseText(text, encoding));
-	}
-
-	function handleEncodingChange(event) {
-		setEncoding(event.currentTarget.value);
 	}
 
 	function handleMouseMove(event) {
@@ -60,10 +54,17 @@
 			return;
 		}
 
+		if (
+			hoveredByteRange?.start === byteRange.start &&
+			hoveredByteRange?.length === byteRange.length
+		)
+			return;
+
 		setHover(byteRange.start, byteRange.length);
 	}
 
 	function clearHover() {
+		if (!hoveredByteRange) return;
 		setHover(null, 0);
 	}
 
@@ -85,14 +86,7 @@
 
 <section class="panel">
 	<h2>Text</h2>
-	<label class="encoding">
-		<span>Encoding</span>
-		<select value={encoding} onchange={handleEncodingChange} aria-label="Text encoding">
-			<option value="utf-8">UTF-8</option>
-			<option value="iso-8859-1">ISO-8859-1</option>
-			<option value="ascii">ASCII</option>
-		</select>
-	</label>
+
 	<div class="editor-wrap">
 		<pre
 			class="overlay"
@@ -101,6 +95,7 @@
 					class:highlighted={segment.highlighted}>{segment.text}</span
 				>{/each}</pre>
 		<textarea
+			class="form-control"
 			bind:this={editorEl}
 			bind:value={text}
 			oninput={handleInput}
@@ -116,27 +111,18 @@
 </section>
 
 <style>
+	.overlay {
+		background: #cff5ff !important;
+	}
+
+	textarea:focus {
+		background: transparent;
+	}
+
 	.panel {
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
-	}
-
-	.encoding {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.85rem;
-		font-weight: 600;
-	}
-
-	.encoding select {
-		font: inherit;
-		padding: 0.25rem 0.45rem;
-		border: 1px solid #c6d0dd;
-		border-radius: 0.5rem;
-		background: #fff;
-		color: #1d2a3a;
 	}
 
 	h2 {
@@ -147,13 +133,20 @@
 
 	.editor-wrap {
 		position: relative;
-		min-height: 16rem;
+		min-height: 400px;
 	}
 
 	.overlay,
 	textarea {
 		box-sizing: border-box;
 		font-family: 'Fira Code', 'JetBrains Mono', monospace;
+		font-variant-ligatures: none;
+		font-feature-settings:
+			'liga' 0,
+			'calt' 0;
+		letter-spacing: 0;
+		tab-size: 1;
+		text-rendering: geometricPrecision;
 		font-size: 0.95rem;
 		line-height: 1.5;
 		padding: 0.75rem;
@@ -164,6 +157,7 @@
 		overflow-wrap: anywhere;
 		overflow-x: hidden;
 		overflow-y: auto;
+		scrollbar-gutter: stable both-edges;
 	}
 
 	.overlay {
@@ -180,6 +174,7 @@
 		z-index: 1;
 		width: 100%;
 		height: 18rem;
+		min-height: 400px;
 		background: transparent;
 		color: #1d2a3a;
 		caret-color: #1d2a3a;
