@@ -1,33 +1,170 @@
 <script>
+	import {
+		binaryCharIndexToByteIndex,
+		buildHighlightSetFromByteRange,
+		bytesToBinaryText,
+		ensureCharVisible,
+		formatBinaryInput,
+		getFirstHighlightedIndex,
+		getCharIndexFromMouse,
+		parseBinaryText,
+		textToSegments
+	} from '$lib/byte-editor';
+
 	let { bytes, hoveredByteRange, setHover, updateBytes } = $props();
 
-	function handleBlur(content, event) {
-		console.log(content, event);
+	let text = $state('');
+	let isFocused = $state(false);
+	let editorEl = $state();
+	let overlayEl = $state();
+
+	$effect(() => {
+		if (!isFocused) {
+			text = bytesToBinaryText(bytes);
+		}
+	});
+
+	let highlightedIndices = $derived(
+		buildHighlightSetFromByteRange(text, binaryCharIndexToByteIndex, hoveredByteRange)
+	);
+	let segments = $derived(textToSegments(text, highlightedIndices));
+
+	$effect(() => {
+		const firstHighlightedIndex = getFirstHighlightedIndex(highlightedIndices);
+		if (firstHighlightedIndex === null || !editorEl) return;
+
+		ensureCharVisible(editorEl, text, firstHighlightedIndex);
+		syncScroll();
+	});
+
+	function handleInput(event) {
+		const target = event.currentTarget;
+		const caretIndex = target.selectionStart ?? target.value.length;
+		const { formattedText, nextCaret } = formatBinaryInput(target.value, caretIndex);
+
+		text = formattedText;
+		updateBytes(parseBinaryText(formattedText));
+
+		target.value = formattedText;
+		target.setSelectionRange(nextCaret, nextCaret);
 	}
 
-	let bytesText = $derived(bytes.map((byte) => byte.toString(2).padStart(8, '0')));
+	function handleMouseMove(event) {
+		const charIndex = getCharIndexFromMouse(event, editorEl, text);
+		if (charIndex === null) {
+			setHover(null, 0);
+			return;
+		}
+
+		const byteIndex = binaryCharIndexToByteIndex(text, charIndex);
+		if (byteIndex === null) {
+			setHover(null, 0);
+			return;
+		}
+
+		setHover(byteIndex, 1);
+	}
+
+	function clearHover() {
+		setHover(null, 0);
+	}
+
+	function syncScroll() {
+		if (!editorEl || !overlayEl) return;
+		overlayEl.scrollLeft = editorEl.scrollLeft;
+		overlayEl.scrollTop = editorEl.scrollTop;
+	}
+
+	function handleFocus() {
+		isFocused = true;
+	}
+
+	function handleBlur() {
+		isFocused = false;
+		text = bytesToBinaryText(bytes);
+	}
 </script>
 
-<div class="text-grid">
-	{#each bytesText as byte, index (index)}
-		<span
-			role="textbox"
-			tabindex="0"
-			class:highlighted={index < hoveredByteRange?.start + hoveredByteRange?.length &&
-				index >= hoveredByteRange?.start}
-			onmouseenter={() => (hoveredByteRange = { start: index, length: 1 })}
-			onmouseleave={() => (hoveredByteRange = null)}
-			contenteditable="true"
-			bind:innerHTML={bytesText[index]}
-			oninput={(e) => handleBlur(byte, e)}
-		>
-			<!-- {byte.toString(2).padStart(8, '0')} -->
-		</span>
-	{/each}
-</div>
+<section class="panel">
+	<h2>Binary</h2>
+	<div class="editor-wrap">
+		<pre
+			class="overlay"
+			bind:this={overlayEl}
+			aria-hidden="true">{#each segments as segment, index (index)}<span
+					class:highlighted={segment.highlighted}>{segment.text}</span
+				>{/each}</pre>
+		<textarea
+			bind:this={editorEl}
+			bind:value={text}
+			oninput={handleInput}
+			onfocus={handleFocus}
+			onblur={handleBlur}
+			onmousemove={handleMouseMove}
+			onmouseleave={clearHover}
+			onscroll={syncScroll}
+			spellcheck="false"
+			wrap="soft"
+			aria-label="Binary editor"></textarea>
+	</div>
+</section>
 
 <style>
-	span {
-		margin-right: 10px;
+	.panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	h2 {
+		margin: 0;
+		font-size: 1rem;
+		font-weight: 700;
+	}
+
+	.editor-wrap {
+		position: relative;
+		min-height: 16rem;
+	}
+
+	.overlay,
+	textarea {
+		box-sizing: border-box;
+		font-family: 'Fira Code', 'JetBrains Mono', monospace;
+		font-size: 0.95rem;
+		line-height: 1.5;
+		padding: 0.75rem;
+		border: 1px solid #c6d0dd;
+		border-radius: 0.65rem;
+		white-space: pre-wrap;
+		word-break: break-all;
+		overflow-wrap: anywhere;
+		overflow-x: hidden;
+		overflow-y: auto;
+	}
+
+	.overlay {
+		position: absolute;
+		inset: 0;
+		margin: 0;
+		pointer-events: none;
+		background: #f5f8fc;
+		color: transparent;
+	}
+
+	textarea {
+		position: relative;
+		z-index: 1;
+		width: 100%;
+		height: 18rem;
+		background: transparent;
+		color: #1d2a3a;
+		caret-color: #1d2a3a;
+		resize: vertical;
+	}
+
+	.highlighted {
+		background: #ffe69c;
+		color: #1d2a3a;
 	}
 </style>

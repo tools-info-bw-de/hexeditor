@@ -5,105 +5,60 @@
 
 	let bytes = $state(new Uint8Array([142, 101, 87, 130]));
 	let encoding = $state('utf-8');
-	let availableEncodings = $state(['ascii', 'iso-8859-1', 'utf-8']);
+	let hoveredByteRange = $state(null);
 
-	let hoveredByteRange = $state(null); // z.B. { start: 0, length: 1 }
-
-	// byte-based
 	function setHover(start, length) {
 		hoveredByteRange = start !== null ? { start, length } : null;
 	}
-
-	let tokens = $derived(parseBytesToTokens(bytes, encoding));
 
 	function updateBytes(newBytes) {
 		bytes = newBytes;
 	}
 
-	function parseBytesToTokens(bytes, encoding) {
-		const tokens = [];
-
-		if (encoding === 'utf-8') {
-			let i = 0;
-			while (i < bytes.length) {
-				const byte = bytes[i];
-				let length;
-
-				// UTF-8 Byte-Längen anhand der ersten Bits bestimmen:
-				if ((byte & 0x80) === 0)
-					length = 1; // ASCII (0xxxxxxx)
-				else if ((byte & 0xe0) === 0xc0)
-					length = 2; // 110xxxxx
-				else if ((byte & 0xf0) === 0xe0)
-					length = 3; // 1110xxxx
-				else if ((byte & 0xf8) === 0xf0)
-					length = 4; // 11110xxx
-				else length = 1; // Defektes Byte
-
-				// Sicherstellen, dass wir nicht über das Ende des Arrays hinauslesen
-				const actualLength = Math.min(length, bytes.length - i);
-				const slice = bytes.subarray(i, i + actualLength);
-
-				// Decodieren des genauen Byte-Abschnitts
-				const decoder = new TextDecoder(encoding, { fatal: false });
-				const char = decoder.decode(slice) || '';
-
-				tokens.push({
-					char: char,
-					byteOffset: i,
-					byteLength: actualLength,
-					isValid: !char.includes('')
-				});
-
-				i += actualLength;
-			}
-		} else {
-			// Für Ein-Byte-Encodings (ASCII, ISO-8859-1 etc.) ist 1 Byte = 1 Zeichen
-			for (let i = 0; i < bytes.length; i++) {
-				const decoder = new TextDecoder(encoding, { fatal: false });
-				const char = decoder.decode(bytes.subarray(i, i + 1)) || '';
-
-				tokens.push({
-					char: char,
-					byteOffset: i,
-					byteLength: 1,
-					isValid: true
-				});
-			}
-		}
-		return tokens;
+	function setEncoding(nextEncoding) {
+		encoding = nextEncoding;
 	}
 </script>
 
-<div id="app">
-	<h1>Welcome to SvelteKit</h1>
-	<p>
-		Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation
-	</p>
+<main class="app">
+	<header>
+		<h1>Hex Editor</h1>
+		<p>Drei gekoppelte Eingaben: Binary, Hex und Text.</p>
+	</header>
 
-	<div class="scroll-container">
-		<div class="three-columns">
-			<!-- Komponenten haben KEIN overflow-y: auto -->
-			<BinaryView {bytes} {hoveredByteRange} {setHover} {updateBytes} />
-			<HexView {tokens} {hoveredByteRange} {setHover} {updateBytes} />
-			<TextView {tokens} {hoveredByteRange} {setHover} {updateBytes} />
-		</div>
-	</div>
-</div>
+	<section class="grid">
+		<BinaryView {bytes} {hoveredByteRange} {setHover} {updateBytes} />
+		<HexView {bytes} {hoveredByteRange} {setHover} {updateBytes} />
+		<TextView {bytes} {hoveredByteRange} {setHover} {updateBytes} {encoding} {setEncoding} />
+	</section>
+</main>
 
 <style>
-	#app {
-		text-align: center;
-		margin-top: 20px;
+	.app {
+		padding: 1rem;
+		max-width: 1200px;
+		margin: 0 auto;
+		color: #1d2a3a;
 	}
 
-	.scroll-container {
-		height: 100vh;
-		overflow-y: auto; /* Einziger Scrollbalken */
+	header h1 {
+		margin: 0;
+		font-size: 1.5rem;
 	}
 
-	.three-columns {
-		display: flex;
-		gap: 20px;
+	header p {
+		margin: 0.35rem 0 1rem;
+	}
+
+	.grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 1rem;
+	}
+
+	@media (max-width: 980px) {
+		.grid {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>
