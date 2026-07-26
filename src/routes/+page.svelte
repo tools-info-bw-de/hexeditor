@@ -69,15 +69,6 @@
 		setEncoding(event.currentTarget.value);
 	}
 
-	function registerSplitContainer(node) {
-		splitContainer = node;
-		return {
-			destroy() {
-				if (splitContainer === node) splitContainer = undefined;
-			}
-		};
-	}
-
 	function openFile() {
 		document.getElementById('binary-file-input')?.click();
 	}
@@ -134,14 +125,6 @@
 		anchor.download = suggestedName;
 		anchor.click();
 		URL.revokeObjectURL(url);
-	}
-
-	function startResize(handle, event) {
-		if (window.matchMedia('(max-width: 980px)').matches) return;
-		const gutterRect = event.currentTarget.getBoundingClientRect();
-		dragOffset = event.clientX - (gutterRect.left + gutterRect.width / 2);
-		activeHandle = handle;
-		event.currentTarget.setPointerCapture(event.pointerId);
 	}
 
 	function stopResize() {
@@ -235,12 +218,8 @@
 			</select>
 		</label>
 	</div>
-	<section
-		class="grid"
-		use:registerSplitContainer
-		style={`--w1:${firstSplit * 100}%; --w2:${(secondSplit - firstSplit) * 100}%; --w3:${(1 - secondSplit) * 100}%;`}
-	>
-		<div class="pane pane-binary">
+	<section class="d-flex gap-3">
+		<div class="pane pane-binary flex-grow-1">
 			<BinaryView
 				{bytes}
 				{hoveredByteRange}
@@ -250,27 +229,9 @@
 			/>
 		</div>
 
-		<div
-			class="gutter"
-			type="button"
-			role="separator"
-			aria-orientation="vertical"
-			aria-label="Breite zwischen Binaer und Hex anpassen"
-			onpointerdown={(event) => startResize('first', event)}
-		></div>
-
 		<div class="pane pane-hex">
 			<HexView {bytes} {hoveredByteRange} {setHover} {updateBytes} {textAreaHeight} />
 		</div>
-
-		<div
-			class="gutter"
-			type="button"
-			role="separator"
-			aria-orientation="vertical"
-			aria-label="Breite zwischen Hex und Text anpassen"
-			onpointerdown={(event) => startResize('second', event)}
-		></div>
 
 		<div class="pane pane-text">
 			<TextView
@@ -333,30 +294,5 @@
 
 	.pane-text {
 		flex: 0 1 var(--w3);
-	}
-
-	.gutter {
-		flex: 0 0 8px;
-		cursor: col-resize;
-		border-radius: 999px;
-		background: #d9e2ee;
-		user-select: none;
-		touch-action: none;
-	}
-
-	.gutter:hover,
-	.gutter:focus {
-		outline: none;
-		background: #b5c7de;
-	}
-
-	@media (max-width: 700px) {
-		.grid {
-			flex-direction: column;
-		}
-
-		.gutter {
-			display: none;
-		}
 	}
 </style>

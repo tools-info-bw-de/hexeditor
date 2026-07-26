@@ -139,6 +139,7 @@
 
 	.overlay,
 	textarea {
+		width: 229.583px !important;
 		box-sizing: border-box;
 		font-family: 'Fira Code', 'JetBrains Mono', monospace;
 		font-variant-ligatures: none;
@@ -158,7 +159,6 @@
 		overflow-wrap: anywhere;
 		overflow-x: hidden;
 		overflow-y: auto;
-		scrollbar-gutter: stable both-edges;
 	}
 
 	.overlay {

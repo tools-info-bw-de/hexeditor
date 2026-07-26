@@ -102,6 +102,7 @@
 					class:highlighted={segment.highlighted}>{segment.text}</span
 				>{/each}</pre>
 		<textarea
+			id="hex-editor"
 			class="form-control"
 			bind:this={editorEl}
 			bind:value={text}
@@ -165,7 +166,9 @@
 		overflow-wrap: normal;
 		overflow-x: hidden;
 		overflow-y: auto;
-		scrollbar-gutter: stable both-edges;
+		min-width: 230px;
+		max-width: 250px;
+		scrollbar-gutter: stable none;
 	}
 
 	.overlay {

@@ -190,7 +190,7 @@
 		overflow-wrap: normal;
 		overflow-x: hidden;
 		overflow-y: auto;
-		scrollbar-gutter: stable both-edges;
+		flex-grow: 1;
 	}
 
 	.overlay {
