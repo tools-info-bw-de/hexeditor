@@ -11,6 +11,10 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
+	<title>Hex-Editor</title>
 </svelte:head>
 
 {@render children()}
+
+<style>
+</style>

@@ -124,6 +124,10 @@
 		background: #ffcece !important;
 	}
 
+	:global(html[data-bs-theme='dark']) .overlay {
+		background: #7d3434 !important;
+	}
+
 	textarea:focus {
 		background: transparent;
 	}
@@ -196,5 +200,9 @@
 	.highlighted {
 		background: #ffe69c;
 		color: #1d2a3a;
+	}
+
+	:global(html[data-bs-theme='dark']) .highlighted {
+		background-color: #1d2a3a;
 	}
 </style>
