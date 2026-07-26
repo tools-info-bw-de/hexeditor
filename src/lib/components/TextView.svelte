@@ -15,6 +15,7 @@
 	let text = $state('');
 	let isFocused = $state(false);
 	let map = $derived(mapped.map);
+	let editBytes = new Uint8Array([]);
 	let editorEl = $state();
 	let overlayEl = $state();
 
@@ -22,6 +23,10 @@
 		if (!isFocused) {
 			text = mapped.text;
 		}
+	});
+
+	$effect(() => {
+		editBytes = bytes;
 	});
 
 	let highlightRange = $derived(findCharRangeForByteRange(map, hoveredByteRange));
@@ -37,8 +42,91 @@
 	});
 
 	function handleInput(event) {
-		text = event.currentTarget.value;
-		updateBytes(parseText(text, encoding));
+		const target = event.currentTarget;
+		const rawText = target.value;
+		const rawCaret = target.selectionStart ?? rawText.length;
+		const { text: nextText, caret: nextCaret } = sanitizeByEncoding(rawText, rawCaret, encoding);
+
+		if (nextText !== rawText) {
+			target.value = nextText;
+			target.setSelectionRange(nextCaret, nextCaret);
+		}
+
+		if (encoding === 'ascii') {
+			const nextBytes = parseAsciiWithStableInvalidBytes(text, nextText, editBytes);
+			editBytes = nextBytes;
+			updateBytes(nextBytes);
+			text = nextText;
+			return;
+		}
+
+		const nextBytes = parseText(nextText, encoding);
+		editBytes = nextBytes;
+		text = nextText;
+		updateBytes(nextBytes);
+	}
+
+	function sanitizeByEncoding(input, caret, activeEncoding) {
+		if (activeEncoding === 'utf-8') {
+			return { text: input, caret };
+		}
+
+		let output = '';
+		let outputCaret = 0;
+		let inputOffset = 0;
+
+		for (const char of input) {
+			const charLength = char.length;
+			const codePoint = char.codePointAt(0) ?? 0;
+			const allowed = activeEncoding === 'ascii' ? codePoint <= 0x7f : codePoint <= 0xff;
+
+			if (allowed) {
+				output += char;
+				if (inputOffset + charLength <= caret) {
+					outputCaret += charLength;
+				}
+			}
+
+			inputOffset += charLength;
+		}
+
+		return { text: output, caret: outputCaret };
+	}
+
+	function parseAsciiWithStableInvalidBytes(previousText, nextText, currentBytes) {
+		if (!previousText.length) return parseText(nextText, 'ascii');
+
+		const previousLength = previousText.length;
+		const nextLength = nextText.length;
+
+		let prefix = 0;
+		const maxPrefix = Math.min(previousLength, nextLength);
+		while (prefix < maxPrefix && previousText[prefix] === nextText[prefix]) {
+			prefix += 1;
+		}
+
+		let suffix = 0;
+		while (
+			suffix < previousLength - prefix &&
+			suffix < nextLength - prefix &&
+			previousText[previousLength - 1 - suffix] === nextText[nextLength - 1 - suffix]
+		) {
+			suffix += 1;
+		}
+
+		const middleText = nextText.slice(prefix, nextLength - suffix);
+		const middleBytes = parseText(middleText, 'ascii');
+
+		const prefixBytes = currentBytes.slice(0, prefix);
+		const suffixStart = Math.max(prefix, previousLength - suffix);
+		const suffixBytes = currentBytes.slice(suffixStart);
+
+		const merged = new Uint8Array(prefixBytes.length + middleBytes.length + suffixBytes.length);
+		merged.set(prefixBytes, 0);
+		merged.set(middleBytes, prefixBytes.length);
+		merged.set(suffixBytes, prefixBytes.length + middleBytes.length);
+
+		return merged;
 	}
 
 	function handleMouseMove(event) {
@@ -97,7 +185,7 @@
 		<textarea
 			class="form-control"
 			bind:this={editorEl}
-			bind:value={text}
+			value={text}
 			style={textAreaHeight > 0 ? `height: ${textAreaHeight}px;` : undefined}
 			oninput={handleInput}
 			onfocus={handleFocus}
@@ -128,8 +216,9 @@
 
 	h2 {
 		margin: 0;
-		font-size: 1rem;
+		font-size: 1.4rem;
 		font-weight: 700;
+		text-align: center;
 	}
 
 	.editor-wrap {

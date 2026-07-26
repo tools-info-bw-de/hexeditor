@@ -162,7 +162,7 @@
 <main class="app">
 	<h1>Hex-Editor</h1>
 
-	<div class="d-flex mb-3">
+	<div class="options d-flex my-4">
 		<input
 			id="binary-file-input"
 			type="file"
@@ -248,6 +248,13 @@
 </main>
 
 <style>
+	.options {
+		background: #f8f9fa;
+		padding: 0.5rem;
+		border-radius: 0.75rem;
+		box-shadow: 0 3px 4px 0px #c6d0dd;
+	}
+
 	.dropdown-menu li button svg {
 		height: 20px;
 	}
@@ -269,15 +276,6 @@
 		gap: 0.5rem;
 		font-size: 0.85rem;
 		font-weight: 600;
-	}
-
-	.grid {
-		display: flex;
-		align-items: stretch;
-		gap: 1rem;
-		--w1: 60%;
-		--w2: 20%;
-		--w3: 20%;
 	}
 
 	.pane {

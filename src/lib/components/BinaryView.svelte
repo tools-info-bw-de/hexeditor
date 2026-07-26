@@ -119,7 +119,7 @@
 </script>
 
 <section class="panel">
-	<h2>Binary</h2>
+	<h2>Binär</h2>
 	<div class="editor-wrap">
 		<pre
 			class="overlay"
@@ -160,8 +160,9 @@
 
 	h2 {
 		margin: 0;
-		font-size: 1rem;
+		font-size: 1.4rem;
 		font-weight: 700;
+		text-align: center;
 	}
 
 	.editor-wrap {
