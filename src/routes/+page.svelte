@@ -103,11 +103,38 @@
 
 		if (typeof mediaQuery.addEventListener === 'function') {
 			mediaQuery.addEventListener('change', handleSystemThemeChange);
-			return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
+		} else {
+			mediaQuery.addListener(handleSystemThemeChange);
 		}
 
-		mediaQuery.addListener(handleSystemThemeChange);
-		return () => mediaQuery.removeListener(handleSystemThemeChange);
+		let infoPopover;
+		(async () => {
+			const infoButton = document.getElementById('info-popover-trigger');
+			if (!infoButton) return;
+
+			const { default: Popover } = await import('bootstrap/js/dist/popover');
+			infoPopover = new Popover(infoButton, {
+				container: 'body',
+				placement: 'bottom',
+				fallbackPlacements: ['bottom'],
+				offset: [0, 8],
+				trigger: 'focus',
+				html: true,
+				content:
+					'<p class="mb-1">Quellcode auf <a href="https://github.com/tools-info-bw-de/hexeditor" target="_blank"><strong>GitHub</strong></a></p>' +
+					'<p class="mb-1"><strong>Lizenz: <a href="https://github.com/tools-info-bw-de/hexeditor/blob/main/LICENSE.md" target="_blank">MIT</a></strong></p>' +
+					'<p class="mb-1"><strong>Autor: <a href="&#x6D;&#x61;&#x69;&#x6C;&#x74;&#x6F;&#x3A;&#x6D;&#x61;&#x72;&#x63;&#x6F;&#x2E;&#x6B;&#x75;&#x65;&#x6D;&#x6D;&#x65;&#x6C;&#x40;&#x62;&#x73;&#x2D;&#x67;&#x79;&#x6D;&#x2D;&#x77;&#x67;&#x74;&#x2E;&#x73;&#x65;&#x6D;&#x69;&#x6E;&#x61;&#x72;&#x2D;&#x62;&#x77;&#x2E;&#x64;&#x65;">Marco Kümmel</a></strong></p>'
+			});
+		})();
+
+		return () => {
+			if (typeof mediaQuery.removeEventListener === 'function') {
+				mediaQuery.removeEventListener('change', handleSystemThemeChange);
+			} else {
+				mediaQuery.removeListener(handleSystemThemeChange);
+			}
+			infoPopover?.dispose();
+		};
 	});
 
 	function handleTextAreaHeightChange(nextHeight) {
@@ -302,6 +329,16 @@
 			>
 		</div>
 	</div>
+	<button
+		id="info-popover-trigger"
+		type="button"
+		class="btn btn-outline-secondary btn-sm info-btn"
+		data-bs-toggle="popover"
+		data-bs-placement="bottom"
+		aria-label="Info anzeigen"
+	>
+		info
+	</button>
 </div>
 
 <main class="app">
@@ -446,6 +483,14 @@
 		top: 0.5rem;
 		right: 0.5rem;
 		z-index: 1000;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 1rem;
+	}
+
+	.info-btn {
+		min-width: 5rem;
 	}
 
 	.options {
