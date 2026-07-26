@@ -2,6 +2,7 @@
 	import BinaryView from '$lib/components/BinaryView.svelte';
 	import HexView from '$lib/components/HexView.svelte';
 	import TextView from '$lib/components/TextView.svelte';
+	import { slide } from 'svelte/transition';
 	import { onMount } from 'svelte';
 
 	let bytes = $state(new Uint8Array([]));
@@ -17,6 +18,63 @@
 	let textAreaHeight = $state(0);
 	let theme = $state('light');
 	let isThemeManual = $state(false);
+	let showAsciiTable = $state(false);
+
+	const asciiControlNames = [
+		'NUL',
+		'SOH',
+		'STX',
+		'ETX',
+		'EOT',
+		'ENQ',
+		'ACK',
+		'BEL',
+		'BS',
+		'TAB',
+		'LF',
+		'VT',
+		'FF',
+		'CR',
+		'SO',
+		'SI',
+		'DLE',
+		'XON',
+		'DC2',
+		'XOFF',
+		'DC4',
+		'NAK',
+		'SYN',
+		'ETB',
+		'CAN',
+		'EM',
+		'SUB',
+		'ESC',
+		'FS',
+		'GS',
+		'RS',
+		'US'
+	];
+
+	const asciiRows = Array.from({ length: 128 }, (_, code) => {
+		const binary = code.toString(2).padStart(8, '0');
+		const hex = code.toString(16).toUpperCase().padStart(2, '0');
+		let textValue;
+
+		if (code <= 31) textValue = asciiControlNames[code];
+		else if (code === 32) textValue = 'SPACE';
+		else if (code === 127) textValue = 'DEL';
+		else textValue = String.fromCharCode(code);
+
+		return { code, binary, hex, textValue };
+	});
+
+	const asciiColumns = 3;
+	const asciiRowsPerColumn = Math.ceil(asciiRows.length / asciiColumns);
+	const asciiTableGroups = Array.from({ length: asciiColumns }, (_, groupIndex) => {
+		const start = groupIndex * asciiRowsPerColumn;
+		const end = start + asciiRowsPerColumn;
+		return asciiRows.slice(start, end);
+	});
 
 	function resolveSystemTheme() {
 		if (typeof window === 'undefined') return 'light';
@@ -96,6 +154,22 @@
 
 	function updateBytes(newBytes) {
 		bytes = newBytes;
+	}
+
+	function appendAsciiByte(code) {
+		const safeCode = Number(code);
+		if (!Number.isInteger(safeCode) || safeCode < 0 || safeCode > 255) return;
+
+		const nextBytes = new Uint8Array(bytes.length + 1);
+		nextBytes.set(bytes, 0);
+		nextBytes[bytes.length] = safeCode;
+		updateBytes(nextBytes);
+	}
+
+	function handleAsciiRowKeydown(event, code) {
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		event.preventDefault();
+		appendAsciiByte(code);
 	}
 
 	function setEncoding(nextEncoding) {
@@ -289,7 +363,7 @@
 			</select>
 		</label>
 	</div>
-	<section class="d-flex gap-3">
+	<section class="d-flex gap-3 split-container">
 		<div class="pane pane-binary flex-grow-1">
 			<BinaryView
 				{bytes}
@@ -316,6 +390,54 @@
 			/>
 		</div>
 	</section>
+
+	<section class="ascii-section mt-3">
+		<div class="form-check form-switch">
+			<input
+				id="ascii-table-switch"
+				type="checkbox"
+				class="form-check-input"
+				role="switch"
+				bind:checked={showAsciiTable}
+				aria-controls="ascii-table-panel"
+				aria-expanded={showAsciiTable}
+			/>
+			<label for="ascii-table-switch" class="form-check-label">Zeige ASCII-Tabelle</label>
+		</div>
+
+		{#if showAsciiTable}
+			<div id="ascii-table-panel" class="ascii-grid mt-2" transition:slide>
+				{#each asciiTableGroups as group, groupIndex (`ascii-group-${groupIndex}`)}
+					<div class="table-responsive">
+						<table class="table table-hover table-sm table-bordered align-middle ascii-table">
+							<thead>
+								<tr>
+									<th scope="col" class="">Binär</th>
+									<th scope="col" class="">Hex</th>
+									<th scope="col" class="">Text</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each group as row (row.code)}
+									<tr
+										class="ascii-row-link"
+										tabindex="0"
+										role="link"
+										onclick={() => appendAsciiByte(row.code)}
+										onkeydown={(event) => handleAsciiRowKeydown(event, row.code)}
+									>
+										<td class="mono col-binary">{row.binary}</td>
+										<td class="mono col-hex">{row.hex}</td>
+										<td class="mono col-text">{row.textValue}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/each}
+			</div>
+		{/if}
+	</section>
 </main>
 
 <style>
@@ -333,8 +455,9 @@
 		box-shadow: 0 3px 8px rgba(var(--bs-body-color-rgb), 0.14);
 	}
 
-	:global(html[data-bs-theme='dark']) .options {
-		box-shadow: 0 3px 8px rgba(var(--bs-body-color-rgb), 0.3);
+	:global(html[data-bs-theme='dark']) .options,
+	:global(html[data-bs-theme='dark']) .ascii-section {
+		box-shadow: 0 3px 8px #000;
 	}
 
 	:global(html[data-bs-theme='dark'] textarea) {
@@ -353,6 +476,7 @@
 	:global([data-bs-theme='dark']) {
 		--bs-body-bg: #494949;
 		--bs-body-color: #f8f9fa;
+		--bs-tertiary-bg: #3c3c3c;
 	}
 
 	.app {
@@ -417,5 +541,85 @@
 
 	.pane-text {
 		flex: 0 1 var(--w3);
+	}
+
+	@media (max-width: 750px) {
+		.split-container {
+			flex-direction: column;
+		}
+	}
+
+	.ascii-section {
+		background: var(--bs-tertiary-bg);
+		border-radius: 0.75rem;
+		padding: 0.75rem;
+		box-shadow: 0 3px 8px rgba(var(--bs-body-color-rgb), 0.12);
+	}
+
+	.ascii-table {
+		margin-bottom: 0;
+		text-align: center;
+	}
+
+	.ascii-grid {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.75rem;
+	}
+
+	.ascii-table th,
+	.ascii-table td {
+		vertical-align: middle;
+	}
+
+	.ascii-row-link {
+		cursor: pointer;
+	}
+
+	.ascii-row-link:focus {
+		outline: 2px solid var(--bs-primary);
+		outline-offset: -2px;
+	}
+
+	.ascii-row-link:hover td {
+		filter: brightness(0.96);
+	}
+
+	:global(html[data-bs-theme='dark']) .ascii-row-link:hover td {
+		filter: brightness(1.1);
+	}
+
+	.mono {
+		font-family: 'Fira Code', 'JetBrains Mono', monospace;
+	}
+
+	.col-binary {
+		background: #d1fad1;
+	}
+
+	.col-hex {
+		background: #ffcece;
+	}
+
+	.col-text {
+		background: #cff5ff;
+	}
+
+	:global(html[data-bs-theme='dark']) .col-binary {
+		background: #23442d;
+	}
+
+	:global(html[data-bs-theme='dark']) .col-hex {
+		background: #4a2727;
+	}
+
+	:global(html[data-bs-theme='dark']) .col-text {
+		background: #1f3e48;
+	}
+
+	@media (max-width: 1100px) {
+		.ascii-grid {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>

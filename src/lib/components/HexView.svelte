@@ -147,7 +147,7 @@
 
 	.editor-wrap {
 		position: relative;
-		min-height: 400px;
+		/* min-height: 400px; */
 	}
 
 	.overlay,
@@ -174,6 +174,16 @@
 		min-width: 230px;
 		max-width: 250px;
 		scrollbar-gutter: stable none;
+	}
+
+	@media (max-width: 750px) {
+		.overlay,
+		textarea {
+			min-width: 100%;
+			max-width: 100%;
+			min-height: 250px !important;
+			max-height: 250px;
+		}
 	}
 
 	.overlay {

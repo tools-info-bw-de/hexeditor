@@ -15,6 +15,3 @@
 </svelte:head>
 
 {@render children()}
-
-<style>
-</style>
