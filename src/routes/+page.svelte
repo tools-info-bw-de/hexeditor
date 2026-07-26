@@ -13,6 +13,14 @@
 	let activeHandle = $state(null);
 	let dragOffset = $state(0);
 	const minPaneRatio = 0.12;
+	let textAreaHeight = $state(0);
+
+	function handleTextAreaHeightChange(nextHeight) {
+		if (!Number.isFinite(nextHeight) || nextHeight <= 0) return;
+		const normalizedHeight = Math.round(nextHeight);
+		if (normalizedHeight === textAreaHeight) return;
+		textAreaHeight = normalizedHeight;
+	}
 
 	function clamp(value, min, max) {
 		return Math.max(min, Math.min(max, value));
@@ -233,7 +241,13 @@
 		style={`--w1:${firstSplit * 100}%; --w2:${(secondSplit - firstSplit) * 100}%; --w3:${(1 - secondSplit) * 100}%;`}
 	>
 		<div class="pane pane-binary">
-			<BinaryView {bytes} {hoveredByteRange} {setHover} {updateBytes} />
+			<BinaryView
+				{bytes}
+				{hoveredByteRange}
+				{setHover}
+				{updateBytes}
+				onTextAreaHeightChange={handleTextAreaHeightChange}
+			/>
 		</div>
 
 		<div
@@ -246,7 +260,7 @@
 		></div>
 
 		<div class="pane pane-hex">
-			<HexView {bytes} {hoveredByteRange} {setHover} {updateBytes} />
+			<HexView {bytes} {hoveredByteRange} {setHover} {updateBytes} {textAreaHeight} />
 		</div>
 
 		<div
@@ -259,7 +273,15 @@
 		></div>
 
 		<div class="pane pane-text">
-			<TextView {bytes} {hoveredByteRange} {setHover} {updateBytes} {encoding} {setEncoding} />
+			<TextView
+				{bytes}
+				{hoveredByteRange}
+				{setHover}
+				{updateBytes}
+				{encoding}
+				{setEncoding}
+				{textAreaHeight}
+			/>
 		</div>
 	</section>
 </main>

@@ -9,7 +9,7 @@
 		parseHexText
 	} from '$lib/byte-editor';
 
-	let { bytes, hoveredByteRange, setHover, updateBytes } = $props();
+	let { bytes, hoveredByteRange, setHover, updateBytes, textAreaHeight = 0 } = $props();
 
 	let text = $state('');
 	let isFocused = $state(false);
@@ -105,6 +105,7 @@
 			class="form-control"
 			bind:this={editorEl}
 			bind:value={text}
+			style={textAreaHeight > 0 ? `height: ${textAreaHeight}px;` : undefined}
 			oninput={handleInput}
 			onfocus={handleFocus}
 			onblur={handleBlur}
@@ -185,7 +186,7 @@
 		background: transparent;
 		color: #1d2a3a;
 		caret-color: #1d2a3a;
-		resize: vertical;
+		resize: none;
 	}
 
 	.highlighted {

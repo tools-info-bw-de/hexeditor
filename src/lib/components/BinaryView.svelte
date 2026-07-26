@@ -9,7 +9,13 @@
 		parseBinaryText
 	} from '$lib/byte-editor';
 
-	let { bytes, hoveredByteRange, setHover, updateBytes } = $props();
+	let {
+		bytes,
+		hoveredByteRange,
+		setHover,
+		updateBytes,
+		onTextAreaHeightChange = () => {}
+	} = $props();
 
 	let text = $state('');
 	let isFocused = $state(false);
@@ -81,6 +87,26 @@
 		overlayEl.scrollLeft = editorEl.scrollLeft;
 		overlayEl.scrollTop = editorEl.scrollTop;
 	}
+
+	$effect(() => {
+		if (!editorEl) return;
+		if (typeof ResizeObserver === 'undefined') return;
+
+		let lastHeight = -1;
+		const observer = new ResizeObserver((entries) => {
+			const nextHeight = Math.round(entries[0]?.contentRect.height ?? 0);
+			if (nextHeight <= 0 || nextHeight === lastHeight) return;
+			lastHeight = nextHeight;
+			onTextAreaHeightChange(nextHeight);
+		});
+
+		observer.observe(editorEl);
+		onTextAreaHeightChange(Math.round(editorEl.getBoundingClientRect().height));
+
+		return () => {
+			observer.disconnect();
+		};
+	});
 
 	function handleFocus() {
 		isFocused = true;
