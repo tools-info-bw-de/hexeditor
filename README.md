@@ -7,7 +7,7 @@ Ein simpler Hex-Editor mit folgenden Funktionen:
 - Up- und Download von Dateien
 - Hovern über Zeichen, um zugehörige Werte in Binär, Hex und Text anzuzeigen
 
-  Aktuell zu finden unter https://tools.info-bw.de/hexeditor/
+Aktuell zu finden unter https://tools.info-bw.de/hexeditor/
 
 # Weiterentwickeln
 
