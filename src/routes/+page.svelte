@@ -479,7 +479,7 @@
 
 <style>
 	.top-right {
-		position: fixed;
+		position: absolute;
 		top: 0.5rem;
 		right: 0.5rem;
 		z-index: 1000;
@@ -558,6 +558,12 @@
 		color: var(--bs-body-color);
 		opacity: 0.8;
 		flex-shrink: 0;
+	}
+
+	@media (max-width: 1350px) {
+		h1 {
+			margin-top: 1rem;
+		}
 	}
 
 	h1 {
@@ -651,15 +657,15 @@
 	}
 
 	:global(html[data-bs-theme='dark']) .col-binary {
-		background: #23442d;
+		background: #3c5029;
 	}
 
 	:global(html[data-bs-theme='dark']) .col-hex {
-		background: #4a2727;
+		background: #7d3434;
 	}
 
 	:global(html[data-bs-theme='dark']) .col-text {
-		background: #1f3e48;
+		background: #2c4768;
 	}
 
 	@media (max-width: 1100px) {
